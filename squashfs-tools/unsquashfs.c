@@ -61,7 +61,7 @@ int fd;
 unsigned int cached_frag = SQUASHFS_INVALID_FRAG;
 unsigned int block_size;
 unsigned int block_log;
-int lsonly = FALSE, info = FALSE, force = FALSE, short_ls = TRUE;
+int lsonly = FALSE, info = FALSE, force = FALSE, short_ls = TRUE, security_info = FALSE;
 int concise = FALSE, quiet = FALSE, numeric = FALSE;
 int use_regex = FALSE;
 char **created_inode;
@@ -588,6 +588,42 @@ int print_filename(char *pathname, struct inode *inode)
 		t->tm_mday, t->tm_hour, t->tm_min, pathname);
 	if((inode->mode & S_IFMT) == S_IFLNK)
 		printf(" -> %s", inode->symlink);
+
+	if(security_info) {
+		unsigned int count;
+		int failed;
+		struct xattr_list *xattr_list;
+		if (inode->xattr != SQUASHFS_INVALID_XATTR) {
+			xattr_list = get_xattr(inode->xattr, &count, &failed);
+			if (!failed) {
+				for(int j = 0; j < count; j++) {
+					if (strcmp(xattr_list[j].full_name, "security.capability") == 0) {
+						printf(" ");
+						//print the magic
+						printf("0x%x,", ((unsigned int*)(xattr_list[j].value))[0]);
+						if (xattr_list[j].vsize >= 20) {
+							unsigned int *v = (unsigned int*) xattr_list[j].value;
+							for (int i = 1; i < xattr_list[j].vsize/4; i++) {
+								printf("0x%x", *(v+i));
+								if (i < (xattr_list[j].vsize/4)-1)
+									printf(",");
+							}
+						}
+					}
+					else if (strcmp(xattr_list[j].full_name, "security.selinux") == 0) {
+						printf(" ");
+						if (xattr_list[j].vsize > 0) {
+							char *v = (char*) xattr_list[j].value;
+							printf(" %s ", v);
+						} else {
+							printf(" - ");
+						}
+					}
+				}
+				free_xattr(xattr_list, count);
+			}
+		}
+	}
 	printf("\n");
 		
 	return 1;
@@ -2757,6 +2793,10 @@ int main(int argc, char *argv[])
 				strcmp(argv[i], "-ll") == 0) {
 			lsonly = TRUE;
 			short_ls = FALSE;
+		} else if(strcmp(argv[i], "-llS") == 0) {
+			lsonly = TRUE;
+			short_ls = FALSE;
+			security_info = TRUE;
 		} else if(strcmp(argv[i], "-llnumeric") == 0 ||
 				strcmp(argv[i], "-lln") == 0) {
 			lsonly = TRUE;
@@ -2837,6 +2877,8 @@ options:
 			ERROR("\t-ll[s]\t\t\tlist filesystem with file "
 				"attributes (like\n");
 			ERROR("\t\t\t\tls -l output), but don't unsquash\n");
+			ERROR("\t-ll[S]\t\t\tlist filesystem with file "
+				"attributes and security attributes\n");
 			ERROR("\t-lln[umeric]\t\t-lls but with numeric uids and gids\n");
 			ERROR("\t-lc\t\t\tlist filesystem concisely, displaying only"
 				" files\n\t\t\t\tand empty directories.  Don't unsquash\n");
