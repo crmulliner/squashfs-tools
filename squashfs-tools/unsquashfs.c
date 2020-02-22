@@ -590,6 +590,7 @@ int print_filename(char *pathname, struct inode *inode)
 		printf(" -> %s", inode->symlink);
 
 	if(security_info) {
+		printf("\t");
 		unsigned int count;
 		int failed;
 		struct xattr_list *xattr_list;
@@ -598,7 +599,6 @@ int print_filename(char *pathname, struct inode *inode)
 			if (!failed) {
 				for(int j = 0; j < count; j++) {
 					if (strcmp(xattr_list[j].full_name, "security.capability") == 0) {
-						printf(" ");
 						//print the magic
 						printf("0x%x,", ((unsigned int*)(xattr_list[j].value))[0]);
 						if (xattr_list[j].vsize >= 20) {
@@ -609,19 +609,32 @@ int print_filename(char *pathname, struct inode *inode)
 									printf(",");
 							}
 						}
+						else {
+							printf("-");
+						}
 					}
-					else if (strcmp(xattr_list[j].full_name, "security.selinux") == 0) {
-						printf(" ");
+					else {
+						printf("-");
+					}
+					printf(" ");
+					if (strcmp(xattr_list[j].full_name, "security.selinux") == 0) {
 						if (xattr_list[j].vsize > 0) {
 							char *v = (char*) xattr_list[j].value;
-							printf(" %s ", v);
-						} else {
-							printf(" - ");
+							printf("%s", v);
 						}
+						else {
+							printf("-");
+						}
+					}
+					else {
+						printf("-");
 					}
 				}
 				free_xattr(xattr_list, count);
 			}
+		}
+		else {
+			printf("- -");
 		}
 	}
 	printf("\n");
